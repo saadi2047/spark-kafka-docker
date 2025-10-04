@@ -1,0 +1,12 @@
+cd ~/spark-kafka-docker
+nano restart-recovery.sh
+# paste the script above
+chmod +x restart-recovery.sh
+
+
+Usage (after any reboot)
+
+Simply run:
+~/spark-kafka-docker/restart-recovery.sh
+
+Within ~20 seconds, your full environment (Kafka + Spark + MySQL + History Server) will be running and tested 🎯
