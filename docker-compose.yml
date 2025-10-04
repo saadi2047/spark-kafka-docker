@@ -10,12 +10,25 @@ services:
     ports:
       - "9092:9092"
     environment:
+      # Basic Kafka node configuration
       - KAFKA_NODE_ID=1
       - KAFKA_PROCESS_ROLES=broker,controller
+
+      # Listeners: internal for controller + external for clients
       - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092   # ✅ critical fix for inter-container access
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+
+      # Log storage
+      - KAFKA_LOG_DIRS=/tmp/kraft-combined-logs
+
+      # Single-node safety
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+
     networks:
       - sparknet
 
@@ -40,11 +53,13 @@ services:
     ports:
       - "8080:8080"
       - "7077:7077"
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host spark-master
     networks:
       - sparknet
     volumes:
-      - spark_events:/spark-events   # Mount shared event log directory
+      - spark_events:/spark-events
 
   # -------------------------
   # ⚙️ Spark Worker
@@ -56,11 +71,13 @@ services:
       - spark-master
     ports:
       - "8081:8081"
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
     networks:
       - sparknet
     volumes:
-      - spark_events:/spark-events   # same shared volume
+      - spark_events:/spark-events
 
   # -------------------------
   # 🗄️ MySQL Database
@@ -75,7 +92,7 @@ services:
       MYSQL_USER: sparkuser
       MYSQL_PASSWORD: sparkpass
     ports:
-      - "3307:3306"   # host port 3307 to avoid local conflict
+      - "3307:3306"   # ✅ avoid local conflict
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -114,3 +131,4 @@ networks:
 volumes:
   mysql_data:
   spark_events:
+
