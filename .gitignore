@@ -1,0 +1,4 @@
+airflow/db_data/
+airflow/logs/
+__pycache__/
+*.pyc
