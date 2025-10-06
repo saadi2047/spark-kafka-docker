@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  # -------------------------
+  # 📦 Loki – log storage backend
+  # -------------------------
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: loki
+    command: -config.file=/etc/loki/config.yaml   # ✅ corrected path
+    ports:
+      - "3100:3100"          # Loki API endpoint
+    volumes:
+      - ./loki/config.yaml:/etc/loki/config.yaml:ro  # ✅ mount working config
+      - loki_data:/loki                               # store indexes & chunks
+    networks:
+      - sparknet
+
+  # -------------------------
+  # 📄 Promtail – log collector
+  # -------------------------
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      # Main config
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      # Access to all container logs
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - loki
+    networks:
+      - sparknet
+
+  # -------------------------
+  # 📊 Grafana – visualization UI
+  # -------------------------
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+    networks:
+      - sparknet
+
+# -------------------------
+# 🌐 Shared Network & Volumes
+# -------------------------
+networks:
+  sparknet:
+    external: true  # reuse existing Spark–Kafka–MySQL network
+
+volumes:
+  grafana_data:
+  loki_data:

@@ -16,7 +16,7 @@ services:
 
       # Listeners: internal for controller + external for clients
       - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092   # ✅ critical fix for inter-container access
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092   # for inter-container access
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
 
@@ -28,7 +28,6 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-
     networks:
       - sparknet
 
@@ -51,8 +50,8 @@ services:
     image: saadimm/spark:4.0.0-aws
     container_name: spark-master
     ports:
-      - "8080:8080"
-      - "7077:7077"
+      - "8081:8080"   # Spark Master UI
+      - "7077:7077"   # Spark cluster port
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
       --host spark-master
@@ -70,7 +69,7 @@ services:
     depends_on:
       - spark-master
     ports:
-      - "8081:8081"
+      - "8082:8081"   # Spark Worker UI (unique port)
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
       spark://spark-master:7077
@@ -78,6 +77,29 @@ services:
       - sparknet
     volumes:
       - spark_events:/spark-events
+
+  # -------------------------
+  # 📜 Spark History Server
+  # -------------------------
+  spark-history-server:
+    image: saadimm/spark:4.0.0-aws
+    container_name: spark-history-server
+    depends_on:
+      - spark-master
+    ports:
+      - "18080:18080"   # History Server UI
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
+    environment:
+      SPARK_HISTORY_OPTS: >
+        -Dspark.history.fs.logDirectory=/spark-events
+        -Dspark.history.fs.cleaner.enabled=true
+        -Dspark.history.fs.cleaner.interval=1h
+        -Dspark.history.fs.cleaner.maxAge=12h
+    volumes:
+      - spark_events:/spark-events
+    networks:
+      - sparknet
 
   # -------------------------
   # 🗄️ MySQL Database
@@ -92,32 +114,9 @@ services:
       MYSQL_USER: sparkuser
       MYSQL_PASSWORD: sparkpass
     ports:
-      - "3307:3306"   # ✅ avoid local conflict
+      - "3307:3306"     # avoid conflict with any local MySQL
     volumes:
       - mysql_data:/var/lib/mysql
-    networks:
-      - sparknet
-
-  # -------------------------
-  # 📜 Spark History Server
-  # -------------------------
-  spark-history-server:
-    image: saadimm/spark:4.0.0-aws
-    container_name: spark-history-server
-    depends_on:
-      - spark-master
-    ports:
-      - "18080:18080"
-    command: >
-      /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
-    environment:
-      SPARK_HISTORY_OPTS: >
-        -Dspark.history.fs.logDirectory=/spark-events
-        -Dspark.history.fs.cleaner.enabled=true
-        -Dspark.history.fs.cleaner.interval=1h
-        -Dspark.history.fs.cleaner.maxAge=12h
-    volumes:
-      - spark_events:/spark-events
     networks:
       - sparknet
 

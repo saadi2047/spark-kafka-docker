@@ -2,3 +2,23 @@ airflow/db_data/
 airflow/logs/
 __pycache__/
 *.pyc
+# Docker data volumes
+mysql_data/
+spark_events/
+airflow/logs/
+airflow/db_data/
+grafana_data/
+loki_data/
+
+# System files
+.DS_Store
+*.log
+__pycache__/
+*.pyc
+*.pid
+*.db
+
+# Credentials or temporary files
+*.json
+*.pem
+*.key
